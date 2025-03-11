@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.002 -->
+<!-- v1.003 -->
 <!-- 
 every amendment, please update the above v:version by adding 1
 -->
@@ -95,8 +95,8 @@ every amendment, please update the above v:version by adding 1
     <!-- [start] JavaScript functions for handling chat and API communications -->
     <script>
       // Clear any stored chat log on page refresh
-      window.onunload = function() {
-        // This handler may prevent caching of the page (depending on browser)
+      window.onunload = function () {
+        // This is an extra measure; actual cache clearing is browser-dependent.
       };
 
       // Get DOM elements
@@ -116,21 +116,21 @@ every amendment, please update the above v:version by adding 1
 
       // Function to send the user input to the API endpoint via POST
       async function sendMessage(prompt) {
-        // Make sure your server is configured for HTTPS; otherwise, use HTTP.
-        const apiUrl = "https://34.126.125.121:11434/api/generate";
+        // Using HTTP because HTTPS gives an ERR_SSL_PROTOCOL_ERROR.
+        const apiUrl = "http://34.126.125.121:11434/api/generate";
         // Construct the request payload expected by your API.
         const payload = {
           model: "deepseek-r1:1.5b",
-          prompt: prompt
+          prompt: prompt,
         };
 
         try {
           const response = await fetch(apiUrl, {
             method: "POST",
             headers: {
-              "Content-Type": "application/json"
+              "Content-Type": "application/json",
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
           });
 
           if (!response.ok) {
@@ -150,7 +150,6 @@ every amendment, please update the above v:version by adding 1
       function handleSend() {
         const prompt = userInput.value.trim();
         if (prompt === "") return;
-
         // Add user's message to the chat log
         addMessage("You: " + prompt, "user");
         // Clear the input field
