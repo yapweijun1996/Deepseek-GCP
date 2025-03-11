@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<!-- v1.001 -->
+<!-- v1.002 -->
 <!-- 
-every amendment, please update the above v:version by add 1
+every amendment, please update the above v:version by adding 1
 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Disable caching -->
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="expires" content="0" />
+    <meta http-equiv="pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Simple Chatbox</title>
     <style>
@@ -90,6 +94,11 @@ every amendment, please update the above v:version by add 1
 
     <!-- [start] JavaScript functions for handling chat and API communications -->
     <script>
+      // Clear any stored chat log on page refresh
+      window.onunload = function() {
+        // This handler may prevent caching of the page (depending on browser)
+      };
+
       // Get DOM elements
       const chatLog = document.getElementById("chat-log");
       const userInput = document.getElementById("user-input");
@@ -130,7 +139,7 @@ every amendment, please update the above v:version by add 1
 
           // Assuming the API returns a JSON response
           const data = await response.json();
-          // Adjust the following line as needed: here we assume the response has useful properties.
+          // Adjust this line as needed for your API response structure.
           addMessage("Bot: " + JSON.stringify(data), "bot");
         } catch (error) {
           addMessage("Bot: Error: " + error.message, "bot");
