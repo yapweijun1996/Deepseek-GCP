@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.004 -->
+<!-- v1.005 -->
 <!-- 
 every amendment, please update the above v:version by adding 1
 -->
@@ -7,95 +7,97 @@ every amendment, please update the above v:version by adding 1
   <head>
     <meta charset="UTF-8" />
     <!-- Disable caching -->
-    <meta
-      http-equiv="cache-control"
-      content="no-cache, no-store, must-revalidate"
-    />
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="expires" content="0" />
     <meta http-equiv="pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Simple Chatbox</title>
     <style>
-      /* [start] CSS for the chatbox styling */
+      /* Minimal CSS styling */
+      * {
+        box-sizing: border-box;
+      }
       body {
-        font-family: Arial, sans-serif;
-        background: #f2f2f2;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background: #fafafa;
         margin: 0;
+        display: flex;
+        height: 100vh;
+        align-items: center;
+        justify-content: center;
       }
       #chat-container {
-        background: #fff;
         width: 90%;
-        max-width: 600px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        padding: 20px;
-        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
       #chat-log {
+        padding: 15px;
         height: 300px;
         overflow-y: auto;
-        border: 1px solid #ddd;
-        padding: 10px;
-        margin-bottom: 15px;
+        border-bottom: 1px solid #eee;
       }
       .message {
-        margin: 5px 0;
-        padding: 8px;
-        border-radius: 4px;
+        margin-bottom: 10px;
+        line-height: 1.4;
       }
       .user {
-        background: #d0e6ff;
         text-align: right;
+        color: #333;
+      }
+      .user::before {
+        content: "You: ";
+        font-weight: 600;
       }
       .bot {
-        background: #e1ffe1;
         text-align: left;
+        color: #007BFF;
+      }
+      .bot::before {
+        content: "Bot: ";
+        font-weight: 600;
       }
       #input-area {
         display: flex;
+        padding: 10px;
       }
       #user-input {
         flex: 1;
-        padding: 10px;
-        border: 1px solid #ccc;
+        padding: 8px 10px;
+        border: 1px solid #ddd;
         border-radius: 4px;
+        font-size: 14px;
       }
       #send-btn {
-        padding: 10px 15px;
-        margin-left: 10px;
+        margin-left: 8px;
+        padding: 0 16px;
         border: none;
         background: #007BFF;
-        color: white;
+        color: #fff;
         border-radius: 4px;
+        font-size: 14px;
         cursor: pointer;
+        transition: background 0.2s ease;
       }
       #send-btn:hover {
         background: #0056b3;
       }
-      /* [end] CSS for the chatbox */
     </style>
   </head>
   <body>
-    <!-- [start] HTML structure for the chatbox -->
     <div id="chat-container">
       <div id="chat-log"></div>
       <div id="input-area">
-        <input
-          type="text"
-          id="user-input"
-          placeholder="Type your message here..."
-          autocomplete="off"
-        />
+        <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" />
         <button id="send-btn">Send</button>
       </div>
     </div>
-    <!-- [end] HTML structure for the chatbox -->
-
-    <!-- [start] JavaScript functions for handling chat and API communications -->
+    
     <script>
       console.log("Page loaded - starting chatbox app");
 
@@ -104,12 +106,12 @@ every amendment, please update the above v:version by adding 1
       const userInput = document.getElementById("user-input");
       const sendBtn = document.getElementById("send-btn");
 
-      // Maintain a conversation state to easily manage data
+      // Maintain a conversation state to manage data
       const conversation = {
         messages: [] // Each message is { role: "bot" or "user", data: [JSON objects], text: "display text", finalized: bool }
       };
 
-      // Update the chat UI with current conversation state.
+      // Update the chat UI with the current conversation state.
       function updateChatUI() {
         chatLog.innerHTML = "";
         conversation.messages.forEach((msg) => {
@@ -123,7 +125,7 @@ every amendment, please update the above v:version by adding 1
       }
 
       // Add a message to conversation state and update the UI.
-      // For bot streaming responses we update the latest bot message.
+      // For streaming responses, update the latest bot message.
       function addMessageToConversation(role, jsonData, textFragment) {
         if (
           role === "bot" &&
@@ -139,7 +141,7 @@ every amendment, please update the above v:version by adding 1
           conversation.messages.push({
             role: role,
             data: [jsonData],
-            text: (role === "bot" ? "Bot: " : "You: ") + textFragment,
+            text: textFragment,
             finalized: jsonData.done || false
           });
         }
@@ -171,51 +173,40 @@ every amendment, please update the above v:version by adding 1
             throw new Error("Network response was not ok");
           }
 
-          // Add the user's message (already added above when sending).
-          // Prepare an empty bot message entry to update streaming response.
+          // Prepare an empty bot message entry to update streaming response
           addMessageToConversation("bot", {}, "");
 
           // Get a reference to the current bot message index in conversation state
           let botMsgIndex = conversation.messages.length - 1;
 
-          // If response.body is not available, use a fallback to full JSON response.
           if (!response.body) {
+            // Fallback if streaming is not supported.
             const fullData = await response.json();
             console.log("Full API response data:", fullData);
-            conversation.messages[botMsgIndex].text = "Bot: " + JSON.stringify(fullData);
+            conversation.messages[botMsgIndex].text = fullData.response;
             conversation.messages[botMsgIndex].finalized = true;
             updateChatUI();
             return;
           }
 
-          // Process the streaming response
+          // Process streaming response
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
 
           while (true) {
             const { done, value } = await reader.read();
-            if (done) {
-              break;
-            }
-            // Accumulate the streaming data
+            if (done) break;
             buffer += decoder.decode(value, { stream: true });
-            
-            // Assume each message is separated by newline
             let parts = buffer.split("\n");
-            // Retain the last incomplete chunk in the buffer.
             buffer = parts.pop();
-
             for (let part of parts) {
               part = part.trim();
               if (!part) continue;
               try {
-                // Parse each JSON message
                 const jsonData = JSON.parse(part);
                 console.log("Parsed JSON:", jsonData);
-                // Update conversation state with each JSON response's text fragment.
                 addMessageToConversation("bot", jsonData, jsonData.response);
-                // Mark the bot message as finalized if done flag is true.
                 if (jsonData.done) {
                   conversation.messages[botMsgIndex].finalized = true;
                 }
@@ -224,7 +215,7 @@ every amendment, please update the above v:version by adding 1
               }
             }
           }
-          // Process any remaining data in the final buffer
+          // Process any remaining data in the buffer.
           if (buffer.trim()) {
             try {
               const jsonData = JSON.parse(buffer);
@@ -244,22 +235,19 @@ every amendment, please update the above v:version by adding 1
         }
       }
 
-      // Handle sending a new message from the user.
+      // Handle sending a new user message.
       function handleSend() {
         const prompt = userInput.value.trim();
-        if (prompt === "") {
-          console.log("Empty prompt input. Nothing to send.");
+        if (!prompt) {
+          console.log("Empty prompt. Nothing to send.");
           return;
         }
         console.log("User input:", prompt);
-        // Add the user's message into conversation state
         addMessageToConversation("user", {}, prompt);
         userInput.value = "";
-        // Send the user prompt to the API
         sendMessage(prompt);
       }
 
-      // Event listeners for button click and Enter key press.
       sendBtn.addEventListener("click", () => {
         console.log("Send button clicked");
         handleSend();
@@ -267,12 +255,11 @@ every amendment, please update the above v:version by adding 1
 
       userInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
-          console.log("Enter key pressed in input field");
+          console.log("Enter key pressed");
           handleSend();
           event.preventDefault();
         }
       });
     </script>
-    <!-- [end] JavaScript functions -->
   </body>
 </html>
