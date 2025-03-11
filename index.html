@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.003 -->
+<!-- v1.004 -->
 <!-- 
 every amendment, please update the above v:version by adding 1
 -->
@@ -7,7 +7,10 @@ every amendment, please update the above v:version by adding 1
   <head>
     <meta charset="UTF-8" />
     <!-- Disable caching -->
-    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+    <meta
+      http-equiv="cache-control"
+      content="no-cache, no-store, must-revalidate"
+    />
     <meta http-equiv="expires" content="0" />
     <meta http-equiv="pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -94,76 +97,177 @@ every amendment, please update the above v:version by adding 1
 
     <!-- [start] JavaScript functions for handling chat and API communications -->
     <script>
-      // Clear any stored chat log on page refresh
-      window.onunload = function () {
-        // This is an extra measure; actual cache clearing is browser-dependent.
-      };
+      console.log("Page loaded - starting chatbox app");
 
       // Get DOM elements
       const chatLog = document.getElementById("chat-log");
       const userInput = document.getElementById("user-input");
       const sendBtn = document.getElementById("send-btn");
 
-      // Utility function to add a message to the chat log
-      function addMessage(text, type) {
-        const messageDiv = document.createElement("div");
-        messageDiv.classList.add("message", type);
-        messageDiv.textContent = text;
-        chatLog.appendChild(messageDiv);
-        // Auto scroll to the latest message
+      // Maintain a conversation state to easily manage data
+      const conversation = {
+        messages: [] // Each message is { role: "bot" or "user", data: [JSON objects], text: "display text", finalized: bool }
+      };
+
+      // Update the chat UI with current conversation state.
+      function updateChatUI() {
+        chatLog.innerHTML = "";
+        conversation.messages.forEach((msg) => {
+          const messageDiv = document.createElement("div");
+          messageDiv.classList.add("message", msg.role);
+          messageDiv.textContent = msg.text;
+          chatLog.appendChild(messageDiv);
+        });
+        // Auto scroll to the bottom of the chat log
         chatLog.scrollTop = chatLog.scrollHeight;
       }
 
-      // Function to send the user input to the API endpoint via POST
+      // Add a message to conversation state and update the UI.
+      // For bot streaming responses we update the latest bot message.
+      function addMessageToConversation(role, jsonData, textFragment) {
+        if (
+          role === "bot" &&
+          conversation.messages.length &&
+          conversation.messages[conversation.messages.length - 1].role === "bot" &&
+          !conversation.messages[conversation.messages.length - 1].finalized
+        ) {
+          // Append to the latest bot message
+          conversation.messages[conversation.messages.length - 1].text += textFragment;
+          conversation.messages[conversation.messages.length - 1].data.push(jsonData);
+        } else {
+          // Create a new message entry in the conversation state
+          conversation.messages.push({
+            role: role,
+            data: [jsonData],
+            text: (role === "bot" ? "Bot: " : "You: ") + textFragment,
+            finalized: jsonData.done || false
+          });
+        }
+        updateChatUI();
+        console.log("Conversation state updated:", conversation);
+      }
+
+      // Send a message to the API endpoint via POST
       async function sendMessage(prompt) {
-        // Using HTTP because HTTPS gives an ERR_SSL_PROTOCOL_ERROR.
+        console.log("Sending message to API. Prompt:", prompt);
         const apiUrl = "http://34.126.125.121:11434/api/generate";
-        // Construct the request payload expected by your API.
         const payload = {
           model: "deepseek-r1:1.5b",
-          prompt: prompt,
+          prompt: prompt
         };
+        console.log("API payload:", payload);
 
         try {
+          // Send the POST request
           const response = await fetch(apiUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
           });
+          console.log("API response status:", response.status);
 
           if (!response.ok) {
+            console.error("Network response was not ok:", response);
             throw new Error("Network response was not ok");
           }
 
-          // Assuming the API returns a JSON response
-          const data = await response.json();
-          // Adjust this line as needed for your API response structure.
-          addMessage("Bot: " + JSON.stringify(data), "bot");
+          // Add the user's message (already added above when sending).
+          // Prepare an empty bot message entry to update streaming response.
+          addMessageToConversation("bot", {}, "");
+
+          // Get a reference to the current bot message index in conversation state
+          let botMsgIndex = conversation.messages.length - 1;
+
+          // If response.body is not available, use a fallback to full JSON response.
+          if (!response.body) {
+            const fullData = await response.json();
+            console.log("Full API response data:", fullData);
+            conversation.messages[botMsgIndex].text = "Bot: " + JSON.stringify(fullData);
+            conversation.messages[botMsgIndex].finalized = true;
+            updateChatUI();
+            return;
+          }
+
+          // Process the streaming response
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+            // Accumulate the streaming data
+            buffer += decoder.decode(value, { stream: true });
+            
+            // Assume each message is separated by newline
+            let parts = buffer.split("\n");
+            // Retain the last incomplete chunk in the buffer.
+            buffer = parts.pop();
+
+            for (let part of parts) {
+              part = part.trim();
+              if (!part) continue;
+              try {
+                // Parse each JSON message
+                const jsonData = JSON.parse(part);
+                console.log("Parsed JSON:", jsonData);
+                // Update conversation state with each JSON response's text fragment.
+                addMessageToConversation("bot", jsonData, jsonData.response);
+                // Mark the bot message as finalized if done flag is true.
+                if (jsonData.done) {
+                  conversation.messages[botMsgIndex].finalized = true;
+                }
+              } catch (err) {
+                console.error("Error parsing JSON chunk:", part, err);
+              }
+            }
+          }
+          // Process any remaining data in the final buffer
+          if (buffer.trim()) {
+            try {
+              const jsonData = JSON.parse(buffer);
+              console.log("Parsed final JSON:", jsonData);
+              addMessageToConversation("bot", jsonData, jsonData.response);
+              if (jsonData.done) {
+                conversation.messages[botMsgIndex].finalized = true;
+              }
+            } catch (err) {
+              console.error("Error parsing final buffer:", buffer, err);
+            }
+          }
+          console.log("Streaming complete.");
         } catch (error) {
-          addMessage("Bot: Error: " + error.message, "bot");
+          console.error("API error encountered:", error);
+          addMessageToConversation("bot", {}, "Error: " + error.message);
         }
       }
 
-      // Function to handle sending of the message
+      // Handle sending a new message from the user.
       function handleSend() {
         const prompt = userInput.value.trim();
-        if (prompt === "") return;
-        // Add user's message to the chat log
-        addMessage("You: " + prompt, "user");
-        // Clear the input field
+        if (prompt === "") {
+          console.log("Empty prompt input. Nothing to send.");
+          return;
+        }
+        console.log("User input:", prompt);
+        // Add the user's message into conversation state
+        addMessageToConversation("user", {}, prompt);
         userInput.value = "";
-        // Call sendMessage function to make the API request with the user's prompt
+        // Send the user prompt to the API
         sendMessage(prompt);
       }
 
-      // Event listener for the send button click
-      sendBtn.addEventListener("click", handleSend);
+      // Event listeners for button click and Enter key press.
+      sendBtn.addEventListener("click", () => {
+        console.log("Send button clicked");
+        handleSend();
+      });
 
-      // Also send the message when the Enter key is pressed
       userInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
+          console.log("Enter key pressed in input field");
           handleSend();
           event.preventDefault();
         }
