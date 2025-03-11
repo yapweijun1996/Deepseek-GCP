@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Simple Chatbox</title>
     <style>
+      /* [start] CSS for the chatbox styling */
       body {
         font-family: Arial, sans-serif;
         background: #f2f2f2;
         display: flex;
-        flex-direction: column;
         justify-content: center;
         align-items: center;
         height: 100vh;
@@ -22,7 +22,7 @@
         border: 1px solid #ccc;
         border-radius: 5px;
         padding: 20px;
-        box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
       }
       #chat-log {
         height: 300px;
@@ -38,9 +38,11 @@
       }
       .user {
         background: #d0e6ff;
+        text-align: right;
       }
       .bot {
         background: #e1ffe1;
+        text-align: left;
       }
       #input-area {
         display: flex;
@@ -63,81 +65,98 @@
       #send-btn:hover {
         background: #0056b3;
       }
+      /* [end] CSS for the chatbox */
     </style>
   </head>
   <body>
+    <!-- [start] HTML structure for the chatbox -->
     <div id="chat-container">
       <div id="chat-log"></div>
       <div id="input-area">
-        <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off" />
+        <input
+          type="text"
+          id="user-input"
+          placeholder="Type your message here..."
+          autocomplete="off"
+        />
         <button id="send-btn">Send</button>
       </div>
     </div>
+    <!-- [end] HTML structure for the chatbox -->
 
+    <!-- [start] JavaScript functions for handling chat and API communications -->
     <script>
-      const chatLog = document.getElementById('chat-log');
-      const userInput = document.getElementById('user-input');
-      const sendBtn = document.getElementById('send-btn');
+      // Get DOM elements
+      const chatLog = document.getElementById("chat-log");
+      const userInput = document.getElementById("user-input");
+      const sendBtn = document.getElementById("send-btn");
 
+      // Utility function to add a message to the chat log
       function addMessage(text, type) {
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', type);
+        const messageDiv = document.createElement("div");
+        messageDiv.classList.add("message", type);
         messageDiv.textContent = text;
         chatLog.appendChild(messageDiv);
+        // Auto scroll to the latest message
         chatLog.scrollTop = chatLog.scrollHeight;
       }
 
+      // Function to send the user input to the API endpoint via POST
       async function sendMessage(prompt) {
-        const apiUrl = 'https://34.126.125.121:11434/api/generate';
-        
-        // request payload resembles your curl command payload
-        const payload = { 
-          model: "deepseek-r1:1.5b", 
-          prompt: prompt 
+        // Make sure your server is configured for HTTPS; otherwise, use HTTP.
+        const apiUrl = "https://34.126.125.121:11434/api/generate";
+        // Construct the request payload expected by your API.
+        const payload = {
+          model: "deepseek-r1:1.5b",
+          prompt: prompt
         };
 
         try {
           const response = await fetch(apiUrl, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json'
+              "Content-Type": "application/json"
             },
             body: JSON.stringify(payload)
           });
 
           if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error("Network response was not ok");
           }
-          
+
+          // Assuming the API returns a JSON response
           const data = await response.json();
-          
-          // display the API response in the chat log
-          addMessage("Bot: " + JSON.stringify(data), 'bot');
+          // Adjust the following line as needed: here we assume the response has useful properties.
+          addMessage("Bot: " + JSON.stringify(data), "bot");
         } catch (error) {
-          addMessage("Bot: Error: " + error.message, 'bot');
+          addMessage("Bot: Error: " + error.message, "bot");
         }
       }
 
+      // Function to handle sending of the message
       function handleSend() {
         const prompt = userInput.value.trim();
-        if (prompt === '') return;
-        
-        // display the user message in the chat log
-        addMessage("You: " + prompt, 'user');
+        if (prompt === "") return;
+
+        // Add user's message to the chat log
+        addMessage("You: " + prompt, "user");
+        // Clear the input field
         userInput.value = "";
-        
-        // send the message to the API
+        // Call sendMessage function to make the API request with the user's prompt
         sendMessage(prompt);
       }
 
-      sendBtn.addEventListener('click', handleSend);
+      // Event listener for the send button click
+      sendBtn.addEventListener("click", handleSend);
 
-      userInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
+      // Also send the message when the Enter key is pressed
+      userInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
           handleSend();
           event.preventDefault();
         }
       });
     </script>
+    <!-- [end] JavaScript functions -->
   </body>
 </html>
