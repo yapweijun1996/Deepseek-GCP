@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple Chatbox</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f2f2f2;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+      #chat-container {
+        background: #fff;
+        width: 90%;
+        max-width: 600px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+      }
+      #chat-log {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin-bottom: 15px;
+      }
+      .message {
+        margin: 5px 0;
+        padding: 8px;
+        border-radius: 4px;
+      }
+      .user {
+        background: #d0e6ff;
+      }
+      .bot {
+        background: #e1ffe1;
+      }
+      #input-area {
+        display: flex;
+      }
+      #user-input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      #send-btn {
+        padding: 10px 15px;
+        margin-left: 10px;
+        border: none;
+        background: #007BFF;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #send-btn:hover {
+        background: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="chat-container">
+      <div id="chat-log"></div>
+      <div id="input-area">
+        <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off" />
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+
+    <script>
+      const chatLog = document.getElementById('chat-log');
+      const userInput = document.getElementById('user-input');
+      const sendBtn = document.getElementById('send-btn');
+
+      function addMessage(text, type) {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', type);
+        messageDiv.textContent = text;
+        chatLog.appendChild(messageDiv);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+
+      async function sendMessage(prompt) {
+        const apiUrl = 'http://34.126.125.121:11434/api/generate';
+        
+        // request payload resembles your curl command payload
+        const payload = { 
+          model: "deepseek-r1:1.5b", 
+          prompt: prompt 
+        };
+
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          
+          const data = await response.json();
+          
+          // display the API response in the chat log
+          addMessage("Bot: " + JSON.stringify(data), 'bot');
+        } catch (error) {
+          addMessage("Bot: Error: " + error.message, 'bot');
+        }
+      }
+
+      function handleSend() {
+        const prompt = userInput.value.trim();
+        if (prompt === '') return;
+        
+        // display the user message in the chat log
+        addMessage("You: " + prompt, 'user');
+        userInput.value = "";
+        
+        // send the message to the API
+        sendMessage(prompt);
+      }
+
+      sendBtn.addEventListener('click', handleSend);
+
+      userInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          handleSend();
+          event.preventDefault();
+        }
+      });
+    </script>
+  </body>
+</html>
