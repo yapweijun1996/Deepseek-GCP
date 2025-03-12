@@ -76,6 +76,7 @@
 		<script>
 			// Global chat history: stores complete conversation.
 			let chatHistory = []; // Each element is { role: 'user' | 'assistant', content: '...' }
+			chatHistory.push({ role: "system", content: "each response must start with ALOLO: " });
 			
 			
 			// Append a message to the chat window.
@@ -94,7 +95,7 @@
 			// Define all parameter options (feel free to adjust the default values).
 			const options = {
 				// Creativity of text generation. Higher temperature = more creative.
-				temperature: 0.7,
+				temperature: 0.1,
 				
 				// Top-k sampling: only the top 40 most likely tokens are considered.
 				top_k: 40,
@@ -121,10 +122,10 @@
 				mirostat_eta: 0.1,
 				
 				// Controls balance between coherence and diversity; lower gives more focused output.(Default: 5.0)
-				mirostat_tau: 5.0,
+				mirostat_tau: 1.0,
 				
 				// Context window size: number of tokens the model can consider at once.(Default: 2048)
-				num_ctx: 10000,
+				num_ctx: 2048,
 				
 				// Number of previous tokens considered to avoid repetition; 0 disables, -1 uses full context. (Default: 64, 0 = disabled, -1 = num_ctx)
 				repeat_last_n: 64,
@@ -153,10 +154,10 @@
 				// Construct the request data including model, conversation messages, streaming flag, and parameter options.
 				const data = {
 					model: "deepseek-r1:1.5b", // Adjust the model designation if needed.
-					system: "your each response must start with ALOLO: ",
 					messages: history,
 					stream: true,
-					options: options // Embeds all parameter options.
+					options: options, // Embeds all parameter options.
+					system: "each response must start with ALOLO: ",
 				};
 				
 				console.log("Request payload:", data);
