@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<!-- v1.014 -->
+<!-- 
+every amendment, please update the above v:version by adding 1
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Disable caching -->
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="expires" content="0" />
+    <meta http-equiv="pragma" content="no-cache" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chatbox with Extended Context & Live Streaming</title>
+    <style>
+      /* Minimal styling for layout */
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #fafafa;
+      }
+      #settings {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px dashed #ccc;
+      }
+      #settings h3 { margin-top: 0; }
+      #settings label {
+        display: inline-block;
+        width: 160px;
+      }
+      #settings input {
+        margin-bottom: 5px;
+        width: 200px;
+      }
+      #chat-container {
+        max-width: 600px;
+        margin: auto;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+      }
+      #chat-log {
+        border: 1px solid #ccc;
+        height: 300px;
+        overflow-y: auto;
+        padding: 10px;
+        margin-bottom: 15px;
+      }
+      .message { margin-bottom: 10px; }
+      .user { text-align: right; color: #333; }
+      .bot { text-align: left; color: #007BFF; }
+      #input-area { display: flex; }
+      #user-input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      #send-btn {
+        margin-left: 8px;
+        padding: 8px 12px;
+        border: none;
+        background: #007BFF;
+        color: #fff;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #reset-btn {
+        margin-top: 10px;
+        padding: 4px 8px;
+        border: none;
+        background: #a00;
+        color: #fff;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Settings Section -->
+    <div id="settings">
+      <h3>AI Tuning Settings</h3>
+      <!-- API Endpoint: User can modify IP; port and endpoint remain fixed -->
+      <div>
+        <label for="api_endpoint">API Endpoint:</label>
+        <input
+          type="text"
+          id="api_endpoint"
+          placeholder="http://[IP_ADDRESS]:11434/api/generate"
+          value="http://34.126.125.121:11434/api/generate"
+        />
+      </div>
+      <div>
+        <label for="model">Model:</label>
+        <input type="text" id="model" value="deepseek-r1:1.5b" />
+      </div>
+      <div>
+        <label for="temperature">Temperature:</label>
+        <input type="number" step="0.1" id="temperature" value="0.7" />
+      </div>
+      <div>
+        <label for="top_p">Top P:</label>
+        <input type="number" step="0.1" id="top_p" value="0.9" />
+      </div>
+      <div>
+        <label for="max_tokens">Max Tokens:</label>
+        <input type="number" id="max_tokens" value="150" />
+      </div>
+      <div>
+        <label for="frequency_penalty">Frequency Penalty:</label>
+        <input type="number" step="0.1" id="frequency_penalty" value="0.0" />
+      </div>
+      <div>
+        <label for="presence_penalty">Presence Penalty:</label>
+        <input type="number" step="0.1" id="presence_penalty" value="0.0" />
+      </div>
+      <div>
+        <!-- Enhance the system prompt to include role instructions -->
+        <label for="system_prompt">System Prompt:</label>
+        <input
+          type="text"
+          id="system_prompt"
+          value="You are an intelligent assistant. Remember the conversation history. I (User) and you (Assistant) are distinct individuals. Respond in context and maintain consistency. Do not reveal your internal thought process."
+        />
+      </div>
+      <button id="reset-btn">Reset Settings</button>
+    </div>
+
+    <!-- Chatbox Container -->
+    <div id="chat-container">
+      <div id="chat-log"></div>
+      <div id="input-area">
+        <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" />
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+
+    <script>
+      console.log("Page loaded - starting chatbox app");
+
+      // Default setting values
+      const defaultSettings = {
+        api_endpoint: "http://34.126.125.121:11434/api/generate",
+        model: "deepseek-r1:1.5b",
+        temperature: "0.7",
+        top_p: "0.9",
+        max_tokens: "150",
+        frequency_penalty: "0.0",
+        presence_penalty: "0.0",
+        system_prompt: "You are an intelligent assistant. Remember the conversation history. I (User) and you (Assistant) are distinct individuals. Respond in context and maintain consistency. Do not reveal your internal thought process."
+      };
+
+      // Functions for settings management.
+      function loadSettings() {
+        document.getElementById("api_endpoint").value = sessionStorage.getItem("api_endpoint") || defaultSettings.api_endpoint;
+        document.getElementById("model").value = sessionStorage.getItem("model") || defaultSettings.model;
+        document.getElementById("temperature").value = sessionStorage.getItem("temperature") || defaultSettings.temperature;
+        document.getElementById("top_p").value = sessionStorage.getItem("top_p") || defaultSettings.top_p;
+        document.getElementById("max_tokens").value = sessionStorage.getItem("max_tokens") || defaultSettings.max_tokens;
+        document.getElementById("frequency_penalty").value = sessionStorage.getItem("frequency_penalty") || defaultSettings.frequency_penalty;
+        document.getElementById("presence_penalty").value = sessionStorage.getItem("presence_penalty") || defaultSettings.presence_penalty;
+        document.getElementById("system_prompt").value = sessionStorage.getItem("system_prompt") || defaultSettings.system_prompt;
+      }
+
+      function saveSettings() {
+        sessionStorage.setItem("api_endpoint", document.getElementById("api_endpoint").value);
+        sessionStorage.setItem("model", document.getElementById("model").value);
+        sessionStorage.setItem("temperature", document.getElementById("temperature").value);
+        sessionStorage.setItem("top_p", document.getElementById("top_p").value);
+        sessionStorage.setItem("max_tokens", document.getElementById("max_tokens").value);
+        sessionStorage.setItem("frequency_penalty", document.getElementById("frequency_penalty").value);
+        sessionStorage.setItem("presence_penalty", document.getElementById("presence_penalty").value);
+        sessionStorage.setItem("system_prompt", document.getElementById("system_prompt").value);
+      }
+
+      function resetSettings() {
+        sessionStorage.clear();
+        loadSettings();
+        console.log("Settings have been reset to default.");
+      }
+
+      document.getElementById("reset-btn").addEventListener("click", resetSettings);
+      const settingInputs = document.querySelectorAll("#settings input");
+      settingInputs.forEach(input => {
+        input.addEventListener("change", saveSettings);
+      });
+      loadSettings();
+
+      // Chatbox DOM elements.
+      const chatLog = document.getElementById("chat-log");
+      const userInput = document.getElementById("user-input");
+      const sendBtn = document.getElementById("send-btn");
+
+      // Conversation history: each message: { role, text }
+      const conversation = { messages: [] };
+
+      // Filter out <think> tags from text.
+      function filterResponseText(text) {
+        return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      }
+
+      // Update chat UI using conversation history.
+      function updateChatUI() {
+        chatLog.innerHTML = "";
+        conversation.messages.forEach(msg => {
+          const div = document.createElement("div");
+          div.classList.add("message", msg.role);
+          div.textContent = msg.text;
+          chatLog.appendChild(div);
+        });
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+
+      // Add a message to the conversation history.
+      function addMessageToConversation(role, text) {
+        conversation.messages.push({ role: role, text: text });
+        updateChatUI();
+        console.log("Conversation history updated:", conversation.messages);
+      }
+
+      // Build messages array including the system prompt and conversation history.
+      function buildMessagesArray() {
+        const systemMessage = {
+          role: "system",
+          content: document.getElementById("system_prompt").value
+        };
+        // Build messages array starting with system message.
+        const messages = [systemMessage];
+        // Loop through conversation history and add messages.
+        conversation.messages.forEach(msg => {
+          // Convert our internal "bot" role to "assistant"
+          const roleMapped = msg.role === "bot" ? "assistant" : msg.role;
+          messages.push({
+            role: roleMapped,
+            content: msg.text
+          });
+        });
+        return messages;
+      }
+
+      // Build full prompt using conversation history and system prompt.
+      // For backward compatibility (if your API expects a prompt field).
+      function buildFullPrompt() {
+        const systemPrompt = document.getElementById("system_prompt").value;
+        let historyText = "";
+        conversation.messages.forEach(msg => {
+          if (msg.role === "user") {
+            historyText += "User: " + msg.text + "\n";
+          } else if (msg.role === "bot") {
+            historyText += "Assistant: " + msg.text + "\n";
+          }
+        });
+        return systemPrompt + "\n" + historyText;
+      }
+
+      // Send message to API.
+      async function sendMessage(userPrompt) {
+        console.log("Sending message to API. User prompt:", userPrompt);
+        // Add the new user message is already added to conversation.
+        const fullPrompt = buildFullPrompt();
+        const messages = buildMessagesArray();
+        console.log("Full prompt sent to API:", fullPrompt);
+        console.log("Messages array:", messages);
+        saveSettings();
+
+        const payload = {
+          model: document.getElementById("model").value,
+          // Optional: if your API still expects a prompt field.
+          prompt: fullPrompt,
+          messages: messages,
+          temperature: parseFloat(document.getElementById("temperature").value),
+          top_p: parseFloat(document.getElementById("top_p").value),
+          max_tokens: parseInt(document.getElementById("max_tokens").value, 10),
+          frequency_penalty: parseFloat(document.getElementById("frequency_penalty").value),
+          presence_penalty: parseFloat(document.getElementById("presence_penalty").value)
+        };
+        console.log("API payload:", payload);
+
+        const apiEndpoint = document.getElementById("api_endpoint").value;
+        try {
+          const response = await fetch(apiEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          console.log("API response status:", response.status);
+          if (!response.ok) {
+            console.error("Network response was not ok", response);
+            throw new Error("Network response was not ok");
+          }
+
+          if (!response.body) {
+            const fullData = await response.json();
+            console.log("Full API response data:", fullData);
+            const botText = filterResponseText(fullData.response);
+            addMessageToConversation("bot", botText);
+            return;
+          }
+
+          // For streaming responses: Prepare an empty bot message.
+          addMessageToConversation("bot", "");
+          const botMsgIndex = conversation.messages.length - 1;
+          let currentBotResponse = "";
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n");
+            buffer = parts.pop();
+            for (let part of parts) {
+              part = part.trim();
+              if (!part) continue;
+              try {
+                const jsonData = JSON.parse(part);
+                let fragment = jsonData.response || "";
+                fragment = filterResponseText(fragment);
+                currentBotResponse += " " + fragment;
+                currentBotResponse = currentBotResponse.trim();
+                // Update the bot's message live.
+                conversation.messages[botMsgIndex].text = currentBotResponse;
+                updateChatUI();
+              } catch (err) {
+                console.error("Error parsing JSON chunk:", part, err);
+              }
+            }
+          }
+
+          if (buffer.trim()) {
+            try {
+              const jsonData = JSON.parse(buffer);
+              let fragment = jsonData.response || "";
+              fragment = filterResponseText(fragment);
+              currentBotResponse += " " + fragment;
+            } catch (err) {
+              console.error("Error parsing final buffer:", buffer, err);
+            }
+          }
+          currentBotResponse = currentBotResponse.trim();
+          console.log("Full bot response:", currentBotResponse);
+          conversation.messages[botMsgIndex].text = currentBotResponse;
+          updateChatUI();
+        } catch (error) {
+          console.error("API error encountered:", error);
+          addMessageToConversation("bot", "Error: " + error.message);
+        }
+      }
+
+      // Handle send button / input.
+      function handleSend() {
+        const userPrompt = userInput.value.trim();
+        if (!userPrompt) return;
+        console.log("User input:", userPrompt);
+        addMessageToConversation("user", userPrompt);
+        userInput.value = "";
+        sendMessage(userPrompt);
+      }
+
+      sendBtn.addEventListener("click", handleSend);
+      userInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") { 
+          handleSend(); 
+          event.preventDefault(); 
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Chatbox</title>
+    <style>
+      /* Minimal CSS for simple and mobile responsive design [start] */
+      body {
+        margin: 0;
+        font-family: sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #fafafa;
+        height: 100vh;
+      }
+      #chat-container {
+        width: 95%;
+        max-width: 480px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      #chat-messages {
+        flex: 1;
+        padding: 10px;
+        overflow-y: auto;
+      }
+      .message {
+        padding: 8px;
+        margin: 5px 0;
+        border-radius: 4px;
+      }
+      .user {
+        background: #e0f7fa;
+        align-self: flex-end;
+      }
+      .bot {
+        background: #ffe0b2;
+        align-self: flex-start;
+      }
+      #chat-input {
+        display: flex;
+        border-top: 1px solid #ddd;
+      }
+      #chat-input input {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        font-size: 16px;
+      }
+      #chat-input button {
+        background: #2196f3;
+        color: #fff;
+        border: none;
+        padding: 0 20px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      /* Minimal CSS for design [end] */
+    </style>
+  </head>
+  <body>
+    <div id="chat-container">
+      <div id="chat-messages"></div>
+      <div id="chat-input">
+        <input type="text" id="userInput" placeholder="Type your message..." />
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+    <script>
+      // Global array to store complete conversation history.
+      let chatHistory = []; // Format: { role: "user" or "assistant", content: "message" }
+
+      // Append a message to the chat area.
+      function appendMessage(text, sender) {
+        var messageDiv = document.createElement("div");
+        messageDiv.classList.add("message", sender);
+        messageDiv.textContent = text;
+        var chatMessagesDiv = document.getElementById("chat-messages");
+        chatMessagesDiv.appendChild(messageDiv);
+        // Auto-scroll to the latest message.
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+      }
+
+      // Send a user's message.
+      function sendMessage() {
+        var userInput = document.getElementById("userInput");
+        var message = userInput.value.trim();
+
+        if (!message) return; // Do nothing if message is empty.
+
+        // Append the message to the UI and store it in the chat history.
+        appendMessage(message, "user");
+        chatHistory.push({ role: "user", content: message });
+
+        // Clear the input field.
+        userInput.value = "";
+
+        // Call the API to get the bot's response with full conversation history.
+        generateChatResponse(chatHistory);
+      }
+
+      // Call the /api/chat endpoint with the entire conversation history.
+      function generateChatResponse(history) {
+        // Prepare the POST body.
+        var data = {
+          model: "deepseek-r1:1.5b",
+          messages: history,
+          stream: false // Disable streaming response.
+        };
+
+        fetch("http://34.124.132.105:11434/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        })
+          .then(function(response) {
+            if (!response.ok) {
+              throw new Error("Network response not ok");
+            }
+            return response.json();
+          })
+          .then(function(json) {
+            // Check if the response contains a valid message.
+            if (json.message && json.message.content) {
+              var botReply = json.message.content;
+              appendMessage(botReply, "bot");
+              // Save the assistant's response in chatHistory.
+              chatHistory.push({ role: "assistant", content: botReply });
+            } else {
+              console.error("Unexpected response structure:", json);
+              appendMessage("Unexpected error: invalid response from API", "bot");
+            }
+          })
+          .catch(function(error) {
+            console.error("Error:", error);
+            appendMessage("Error getting response from API", "bot");
+          });
+      }
+
+      // Event listeners for sending messages.
+      document.getElementById("sendBtn").addEventListener("click", sendMessage);
+      document.getElementById("userInput").addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+          sendMessage();
+        }
+      });
+    </script>
+  </body>
+</html>
