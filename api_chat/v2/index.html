@@ -127,10 +127,10 @@
 				num_ctx: 10000,
 				
 				// Number of previous tokens considered to avoid repetition; 0 disables, -1 uses full context. (Default: 64, 0 = disabled, -1 = num_ctx)
-				repeat_last_n: -1,
+				repeat_last_n: 64,
 				
 				// Minimum probability threshold for token selection relative to the most likely token.(Default: 0.0)
-				min_p: 0.0
+				min_p: 0.05
 			};
 			
 			// Send a user's message
