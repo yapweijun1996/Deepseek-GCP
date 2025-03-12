@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Simple Chatbox with Complete Parameters</title>
+		<style>
+			/* Minimal CSS for simple and mobile responsive design [start] */
+			body {
+				margin: 0;
+				font-family: sans-serif;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				background: #fafafa;
+				height: 100vh;
+			}
+			#chat-container {
+				width: 95%;
+				max-width: 480px;
+				background: #fff;
+				border: 1px solid #ddd;
+				border-radius: 5px;
+				display: flex;
+				flex-direction: column;
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			}
+			#chat-messages {
+				flex: 1;
+				padding: 10px;
+				overflow-y: auto;
+			}
+			.message {
+				padding: 8px;
+				margin: 5px 0;
+				border-radius: 4px;
+			}
+			.user {
+				background: #e0f7fa;
+				align-self: flex-end;
+			}
+			.bot {
+				background: #ffe0b2;
+				align-self: flex-start;
+			}
+			#chat-input {
+				display: flex;
+				border-top: 1px solid #ddd;
+			}
+			#chat-input input {
+				flex: 1;
+				padding: 10px;
+				border: none;
+				font-size: 16px;
+			}
+			#chat-input button {
+				background: #2196f3;
+				color: #fff;
+				border: none;
+				padding: 0 20px;
+				font-size: 16px;
+				cursor: pointer;
+			}
+			/* Minimal CSS for design [end] */
+		</style>
+	</head>
+	<body>
+		<div id="chat-container">
+			<div id="chat-messages"></div>
+			<div id="chat-input">
+				<input type="text" id="userInput" placeholder="Type your message..." />
+				<button id="sendBtn">Send</button>
+			</div>
+		</div>
+		
+		<script>
+			// Global chat history: stores complete conversation.
+			let chatHistory = []; // Each element is { role: 'user' | 'assistant', content: '...' }
+			
+			
+			// Append a message to the chat window.
+			function appendMessage(text, sender) {
+				const messageDiv = document.createElement("div");
+				messageDiv.classList.add("message", sender);
+				messageDiv.textContent = text;
+				const chatMessagesDiv = document.getElementById("chat-messages");
+				chatMessagesDiv.appendChild(messageDiv);
+				// Auto-scroll to show the latest message.
+				chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+				return messageDiv;
+			}
+			
+			
+			// Define all parameter options (feel free to adjust the default values).
+			const options = {
+				// Creativity of text generation. Higher temperature = more creative.
+				temperature: 0.7,
+				
+				// Top-k sampling: only the top 40 most likely tokens are considered.
+				top_k: 40,
+				
+				// Top-p sampling: considers tokens until cumulative probability reaches 0.9.
+				top_p: 0.9,
+				
+				// Maximum tokens to generate (-1 for unlimited).
+				num_predict: -1,
+				
+				// Penalizes repeated tokens to reduce redundancy;  A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)
+				repeat_penalty: 1.5,
+				
+				// Ensures reproducibility by setting a random seed. Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: 0)
+				seed: 42,
+				
+				// Stop sequences: generation stops when these tokens/strings are encountered.
+				stop: ["User:", "AI:"],
+				
+				// Mirostat sampling mode: 0 = disabled, 1 = using Mirostat, 2 = using Mirostat 2.0.
+				mirostat: 0,
+				
+				// Learning rate for Mirostat; lower values mean slower but steadier adjustment.(Default: 0.1)
+				mirostat_eta: 0.1,
+				
+				// Controls balance between coherence and diversity; lower gives more focused output.(Default: 5.0)
+				mirostat_tau: 5.0,
+				
+				// Context window size: number of tokens the model can consider at once.(Default: 2048)
+				num_ctx: 10000,
+				
+				// Number of previous tokens considered to avoid repetition; 0 disables, -1 uses full context. (Default: 64, 0 = disabled, -1 = num_ctx)
+				repeat_last_n: -1,
+				
+				// Minimum probability threshold for token selection relative to the most likely token.(Default: 0.0)
+				min_p: 0.0
+			};
+			
+			// Send a user's message
+			function sendMessage() {
+				const userInput = document.getElementById("userInput");
+				const message = userInput.value.trim();
+				if (!message) return; // Skip if empty.
+				
+				// Append and record the user message.
+				appendMessage(message, "user");
+				chatHistory.push({ role: "user", content: message });
+				userInput.value = "";
+				
+				// Generate a bot response.
+				generateChatResponse(chatHistory);
+			}
+			
+			// Generate chat response by calling an API with the full message history and parameter options.
+			function generateChatResponse(history) {
+				// Construct the request data including model, conversation messages, streaming flag, and parameter options.
+				const data = {
+					model: "deepseek-r1:1.5b", // Adjust the model designation if needed.
+					system: "your each response must start with ALOLO: ",
+					messages: history,
+					stream: true,
+					options: options // Embeds all parameter options.
+				};
+				
+				console.log("Request payload:", data);
+				
+				fetch("http://34.124.132.105:11434/api/chat", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(data)
+				})
+				.then(response => {
+					if (!response.ok) {
+						throw new Error("Network response not ok");
+					}
+					// Begin processing the streamed response.
+					return processStreamedResponse(response.body.getReader());
+				})
+				.then(botReply => {
+					// Once streamed response is fully received, add it to chat history.
+					chatHistory.push({ role: "assistant", content: botReply });
+				})
+				.catch(error => {
+					console.error("Error during fetch:", error);
+					appendMessage("Error getting response from API", "bot");
+				});
+			}
+			
+			// Process a streaming response from the API endpoint.
+			function processStreamedResponse(reader) {
+				const decoder = new TextDecoder("utf-8");
+				let fullMessage = "";
+				let buffer = ""; // Buffer for partial JSON lines.
+				// Create an element for the bot message which will get updated in real-time.
+				const botMessageElem = appendMessage("", "bot");
+				
+				// Recursive function to fetch each chunk.
+				function readStream() {
+					return reader.read().then(({ done, value }) => {
+						if (done) {
+							return fullMessage;
+						}
+						buffer += decoder.decode(value, { stream: true });
+						const lines = buffer.split("\n");
+						buffer = lines.pop(); // Preserve any incomplete line.
+						
+						// Process complete lines (each expected to be a JSON string).
+						lines.forEach(line => {
+							if (line.trim() === "") return;
+							try {
+								const json = JSON.parse(line);
+								if (json.message && json.message.content) {
+									fullMessage += json.message.content;
+									botMessageElem.textContent = fullMessage;
+								}
+							} catch (e) {
+								console.error("JSON parsing error:", e, line);
+							}
+						});
+						
+						// Auto-scroll the chat area.
+						document.getElementById("chat-messages").scrollTop =
+						document.getElementById("chat-messages").scrollHeight;
+						return readStream();
+					});
+				}
+				return readStream();
+			}
+			
+			// Set up event listeners for user interactions.
+			document.getElementById("sendBtn").addEventListener("click", sendMessage);
+			document.getElementById("userInput").addEventListener("keydown", event => {
+				if (event.key === "Enter") sendMessage();
+			});
+		</script>
+	</body>
+</html>
