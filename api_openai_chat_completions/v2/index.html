@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Chatbox</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    /* [start] Overall page styling */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f7f7f7;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      max-width: 600px;
+      width: 100%;
+      margin: auto;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      flex: 1;
+    }
+    /* [end] Overall page styling */
+
+    /* [start] Chat display area styling */
+    .chat-box {
+      flex: 1;
+      padding: 15px;
+      background: #f1f1f1;
+      overflow-y: auto;
+    }
+    .message {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 15px;
+      max-width: 80%;
+      word-wrap: break-word;
+      position: relative;
+      clear: both;
+    }
+    .message.user {
+      background-color: #007bff;
+      color: #fff;
+      margin-left: auto;
+    }
+    .message.api {
+      background-color: #e5e5ea;
+      color: #000;
+      margin-right: auto;
+    }
+    /* [end] Chat display area styling */
+
+    /* [start] Chat input area styling */
+    .chat-input {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+    .chat-input input[type="text"] {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      font-size: 16px;
+      outline: none;
+    }
+    .chat-input button {
+      background-color: #007bff;
+      border: none;
+      color: #fff;
+      padding: 0 20px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .chat-input button:hover {
+      background-color: #0056b3;
+    }
+    /* [end] Chat input area styling */
+
+    /* [start] Responsive adjustments */
+    @media (max-width: 600px) {
+      .chat-container {
+        border: none;
+        border-radius: 0;
+        height: 100vh;
+      }
+      .chat-input input[type="text"] {
+        padding: 10px;
+      }
+      .chat-input button {
+        padding: 0 15px;
+        font-size: 14px;
+      }
+    }
+    /* [end] Responsive adjustments */
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <!-- Chat display area -->
+    <div id="chatBox" class="chat-box">
+      <!-- Initial welcome message -->
+      <div class="message api">Welcome! Type your message and press Send.</div>
+    </div>
+    <!-- Chat input area -->
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="Type your message...">
+      <button onclick="handleUserMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    // API configuration parameters
+    const apiKey = 'ollama'; // Replace with your actual API key
+    const baseURL = 'http://35.247.174.1:11434/v1/chat/completions';
+    const modelName = 'deepseek-r1:1.5b';
+
+    // sendChatRequest sends the request to the API with the provided message.
+    function sendChatRequest(message) {
+      const requestData = {
+        model: modelName,
+        max_completion_tokens: 10000,
+        messages: [
+          {
+            role: 'user',
+            content: message
+          }
+        ]
+      };
+
+      // Use fetch to send a POST request
+      fetch(baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(requestData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log(data); // Log for debugging
+        let displayText = '';
+        if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+          displayText = data.choices[0].message.content.trim();
+        } else {
+          displayText = 'API response is missing or incomplete.';
+          console.error(displayText);
+        }
+        appendMessage(displayText, 'api');
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        appendMessage('Error: ' + error, 'api');
+      });
+    }
+
+    // handleUserMessage gathers the user input, appends it to the chat box,
+    // and sends the chat request.
+    function handleUserMessage() {
+      const inputField = document.getElementById('userInput');
+      const message = inputField.value.trim();
+      if (!message) return;
+
+      // Append the user's message to the chat box and clear the input.
+      appendMessage(message, 'user');
+      inputField.value = '';
+      // Scroll to the bottom of the chat box.
+      scrollChatToBottom();
+
+      // Send message to API.
+      sendChatRequest(message);
+    }
+
+    // appendMessage adds a new message element to the chat box.
+    function appendMessage(text, sender) {
+      const chatBox = document.getElementById('chatBox');
+      const messageElem = document.createElement('div');
+      messageElem.classList.add('message', sender);
+      messageElem.textContent = text;
+      chatBox.appendChild(messageElem);
+      scrollChatToBottom();
+    }
+
+    // scrollChatToBottom ensures the latest message is visible.
+    function scrollChatToBottom() {
+      const chatBox = document.getElementById('chatBox');
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Optionally, allow sending message using the Enter key.
+    document.getElementById('userInput').addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        handleUserMessage();
+      }
+    });
+  </script>
+</body>
+</html>
