@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chatbox - Minimal and Mobile Responsive</title>
+  <style>
+    /* Minimal CSS for basic layout and mobile responsivity */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f2f2f2;
+    }
+    #chat-container {
+      display: flex;
+      flex-direction: column;
+      width: 95%;
+      max-width: 600px;
+      height: 95vh;
+      background: #ffffff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #chat-messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    .message {
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 4px;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .user {
+      background: #daf1ff;
+      align-self: flex-end;
+    }
+    .bot {
+      background: #ffe7bf;
+      align-self: flex-start;
+    }
+    #chat-input {
+      display: flex;
+      border-top: 1px solid #ccc;
+    }
+    #chat-input input {
+      flex: 1;
+      border: none;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #chat-input button {
+      padding: 0 15px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #sendBtn {
+      background: #2196f3;
+      color: #fff;
+    }
+    #stopBtn {
+      background: #f44336;
+      color: #fff;
+    }
+    /* Button hover state for better UX */
+    #chat-input button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <div id="chat-messages"></div>
+    <div id="chat-input">
+      <input type="text" id="userInput" placeholder="Type your message...">
+      <button id="sendBtn">Send</button>
+      <button id="stopBtn">Stop</button>
+    </div>
+  </div>
+
+  <script>
+    // Initial Chat History [start]
+    let chatHistory = [
+      { role: "system", content: "You are a helpful assistant. Keep responses short unless more details are required." }
+    ];
+
+    // Options for API Calls
+    const options = {
+      temperature: 0.5,
+      top_k: 40,
+      top_p: 0.9,
+      num_predict: -1,
+      repeat_penalty: 1.5,
+      seed: 8,
+      stop: ["User:", "AI:"],
+      num_ctx: 2048,
+      repeat_last_n: -1
+    };
+
+    // Holds the current stream reader so it can be cancelled if needed.
+    let currentReader = null;
+    // Initial Chat History [end]
+
+    // Append a message to the chat display [start]
+    function appendMessage(text, sender) {
+      const messageDiv = document.createElement("div");
+      messageDiv.classList.add("message", sender);
+      messageDiv.textContent = text;
+      document.getElementById("chat-messages").appendChild(messageDiv);
+      document.getElementById("chat-messages").scrollTop = document.getElementById("chat-messages").scrollHeight;
+      return messageDiv;
+    }
+    // Append a message to the chat display [end]
+
+    // Sends the user message and triggers the assistant response [start]
+    async function sendMessage() {
+      const userInput = document.getElementById("userInput");
+      const message = userInput.value.trim();
+      if (!message) return;
+
+      appendMessage(message, "user");
+      chatHistory.push({ role: "user", content: message });
+      userInput.value = "";
+      await generateChatResponse();
+    }
+    // Sends the user message and triggers the assistant response [end]
+
+    // Generate chat response from backend API [start]
+    async function generateChatResponse() {
+      // Clear previous stream reference
+      currentReader = null;
+      
+      const data = {
+        model: "llama3-groq-tool-use:8b",
+        messages: chatHistory,
+        stream: true,
+        options: options
+      };
+
+      try {
+        const response = await fetch("http://35.247.174.1:11434/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok)
+          throw new Error("API request failed: " + response.statusText);
+
+        // Append an empty bot message element that will update as response streams.
+        const botMessageElem = appendMessage("", "bot");
+        currentReader = response.body.getReader();
+        const botReply = await processStreamedResponse(currentReader, botMessageElem);
+        currentReader = null;
+        // Add the final bot reply to the chat history.
+        chatHistory.push({ role: "assistant", content: botReply.text });
+      } catch (error) {
+        console.error("Error fetching chat response:", error);
+        appendMessage("Error getting response from API", "bot");
+      }
+    }
+    // Generate chat response from backend API [end]
+
+    // Process the stream response from the API [start]
+    async function processStreamedResponse(reader, botMessageElem) {
+      const decoder = new TextDecoder("utf-8");
+      let fullMessage = "";
+      let buffer = "";
+      let finished = false;
+
+      while (!finished) {
+        let result;
+        try {
+          result = await reader.read();
+        } catch (e) {
+          console.log("Streaming cancelled.");
+          break;
+        }
+        const { done, value } = result;
+        if (done) break;
+
+        // Decode the streaming chunk.
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+
+        // Retain incomplete line.
+        buffer = lines.pop();
+
+        for (let line of lines) {
+          if (!line.trim()) continue;
+
+          // Remove "data: " prefix if present.
+          if (line.startsWith("data: ")) {
+            line = line.substring(6);
+          }
+
+          if (line.trim() === "[DONE]") {
+            finished = true;
+            break;
+          }
+
+          try {
+            const json = JSON.parse(line);
+            if (json.choices && json.choices.length > 0) {
+              const delta = json.choices[0].delta;
+              if (delta.content) {
+                fullMessage += delta.content;
+                botMessageElem.textContent = fullMessage;
+              }
+              if (json.choices[0].finish_reason && json.choices[0].finish_reason === "stop") {
+                finished = true;
+              }
+            }
+          } catch (e) {
+            console.error("JSON parsing error:", e, "Line:", line);
+          }
+        }
+        document.getElementById("chat-messages").scrollTop = document.getElementById("chat-messages").scrollHeight;
+      }
+      return { text: fullMessage };
+    }
+    // Process the stream response from the API [end]
+
+    // Stop the current streaming response.
+    function stopResponse() {
+      if (currentReader) {
+        try {
+          currentReader.cancel();
+          currentReader = null;
+          console.log("Streaming response stopped by the user.");
+        } catch (e) {
+          console.error("Error stopping the stream:", e);
+        }
+      }
+    }
+
+    // Setup event listeners for UI buttons and input field [start]
+    document.getElementById("sendBtn").addEventListener("click", sendMessage);
+    document.getElementById("stopBtn").addEventListener("click", stopResponse);
+    document.getElementById("userInput").addEventListener("keydown", event => {
+      if (event.key === "Enter") sendMessage();
+    });
+    // Setup event listeners for UI buttons and input field [end]
+  </script>
+</body>
+</html>
